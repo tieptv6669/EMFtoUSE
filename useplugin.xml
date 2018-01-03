@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?use version="4.2.0"?>
+<plugin name="EMFtoUSE" version="0.1">
+	<action label="Import from EMF"
+		class="org.uet.emftouse.actions.ActionImport"
+		tooltip="Import from EMF"
+		menu="EMF support"
+		menuitem="Import from EMF"
+		toolbaritem="Import from EMF"
+		id="org.uet.emftouse.actions.ActionImport" 
+		icon="Resources/ic_import.png">
+	</action>
+	<action label="Save model to file"
+		class="org.uet.emftouse.actions.ActionSave"
+		tooltip="Save model to file"
+		menu="EMF support"
+		menuitem="Save model to file"
+		toolbaritem="Save model to file"
+		id="org.uet.emftouse.actions.ActionSave" 
+		icon="Resources/ic_save.png">
+	</action>
+</plugin>
