@@ -11,6 +11,7 @@ import javax.swing.JFileChooser;
 
 import org.eclipse.emf.common.util.EList;
 import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.ecore.EAnnotation;
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EClass;
 import org.eclipse.emf.ecore.EEnum;
@@ -21,6 +22,8 @@ import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
 import org.eclipse.emf.ecore.xmi.impl.EcoreResourceFactoryImpl;
+import org.tzi.use.api.UseApiException;
+import org.tzi.use.api.UseModelApi;
 import org.tzi.use.config.Options;
 import org.tzi.use.gui.main.MainWindow;
 import org.tzi.use.gui.util.ExtFileFilter;
@@ -98,20 +101,22 @@ public class ActionImport implements IPluginActionDelegate {
 		EList<EObject> listElement = univEPackage.eContents();
 		// Examine each element
 		for(EObject x : listElement){
-			
 			// Convert all class
 			if(x.eClass().getName() == "EClass"){
 				EClass temp = (EClass) x;
+				
 				// Get all attribute of the class in ecore model
 				EList<EAttribute> eattri = temp.getEAllAttributes();
 				
 				// Create new class in USE
 				MClass newClass;
+								
 				if(temp.isAbstract()){
 					newClass = mf.createClass(temp.getName(), true);
 				}else{
 					newClass = mf.createClass(temp.getName(), false);
 				}
+				
 				// Add class into model in USE
 				try {
 					newModel.addClass(newClass);
@@ -161,7 +166,9 @@ public class ActionImport implements IPluginActionDelegate {
 							e.printStackTrace();
 						}
 					}
+					
 				}
+				
 			}
 			
 			// Convert all enum type
@@ -182,9 +189,8 @@ public class ActionImport implements IPluginActionDelegate {
 					e1.printStackTrace();
 				}
 			}
-			
 		}
-		
+				
 		ArrayList<EReference> listEre = new ArrayList<>();
 		for(EObject eo : listElement){
 			if(eo.eClass().getName() == "EClass"){
@@ -209,6 +215,9 @@ public class ActionImport implements IPluginActionDelegate {
 				// Convert reference
 				EList<EReference> ereferen = temp.getEAllReferences();
 				for(EReference e : ereferen){
+					if(e.getEOpposite() == null) {
+						System.out.println(e.toString());
+					}
 					listEre.add(e);
 				}
 			}
@@ -220,7 +229,6 @@ public class ActionImport implements IPluginActionDelegate {
 			int index = 1;
 			while(index < listEre.size()){
 				if(temp.equals(listEre.get(index).getEOpposite())){
-					System.out.println("True");
 					tempOpposite = listEre.remove(index);
 					break;
 				}else{
@@ -228,45 +236,77 @@ public class ActionImport implements IPluginActionDelegate {
 				}
 			}
 			
-			// DO something
-			MMultiplicity mm = mf.createMultiplicity();
-			mm.addRange(temp.getLowerBound(), temp.getUpperBound());
-			MMultiplicity mm2 = mf.createMultiplicity();
-			mm2.addRange(tempOpposite.getLowerBound(), tempOpposite.getUpperBound());
-			MAssociation ma = mf.createAssociation("");
-			Collection<MClass> allClass = newModel.classes();
-			MClass referenceTo = null;
-			MClass yourself = null;
-			for(MClass mc : allClass){
-				if(mc.name() == temp.getEContainingClass().getName()){
-					yourself = mc;
+			if(tempOpposite != null) {
+				// DO something
+				MMultiplicity mm = mf.createMultiplicity();
+				mm.addRange(temp.getLowerBound(), temp.getUpperBound());
+				MMultiplicity mm2 = mf.createMultiplicity();
+				mm2.addRange(tempOpposite.getLowerBound(), tempOpposite.getUpperBound());
+				
+				MAssociation ma = mf.createAssociation("");
+				MClass referenceTo = null;
+				MClass yourself = null;
+				referenceTo = newModel.getClass(temp.getEContainingClass().getName());
+				yourself = newModel.getClass(tempOpposite.getEContainingClass().getName());
+//				for(MClass mc : allClass){
+//					if(mc.name() == temp.getEContainingClass().getName()){
+//						yourself = mc;
+//					}
+//					if(mc.name() == tempOpposite.getEContainingClass().getName()){
+//						referenceTo = mc;
+//					}
+//				}
+				
+				MAssociationEnd mae = mf.createAssociationEnd(yourself, temp.getName(), mm2, MAggregationKind.NONE, temp.isOrdered(), Collections.emptyList());;
+				MAssociationEnd mae2 = mf.createAssociationEnd(referenceTo, tempOpposite.getName(), mm, MAggregationKind.NONE, tempOpposite.isOrdered(), Collections.emptyList());
+				try {
+					ma.addAssociationEnd(mae);
+					ma.addAssociationEnd(mae2);
+				} catch (MInvalidModelException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
-				if(mc.name() == tempOpposite.getEContainingClass().getName()){
-					referenceTo = mc;
+				
+				try {
+					newModel.addAssociation(ma);
+				} catch (MInvalidModelException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
 			}
 			
-			MAssociationEnd mae = mf.createAssociationEnd(yourself, temp.getName(), mm2, MAggregationKind.NONE, temp.isOrdered(), Collections.emptyList());;
-			MAssociationEnd mae2 = mf.createAssociationEnd(referenceTo, tempOpposite.getName(), mm, MAggregationKind.NONE, tempOpposite.isOrdered(), Collections.emptyList());
-			try {
-				ma.addAssociationEnd(mae);
-				ma.addAssociationEnd(mae2);
-			} catch (MInvalidModelException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			if(tempOpposite == null) {
+				System.out.println(temp.toString() + "false");
 			}
-			try {
-				newModel.addAssociation(ma);
-			} catch (MInvalidModelException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			//
 			
 			listEre.remove(0);
 		}
 		
+		for(EObject x : listElement){
+			// Convert all class
+			if(x.eClass().getName() == "EClass"){
+				EClass temp = (EClass) x;
+				MClass cls = newModel.getClass(temp.getName());
+				// Add constraint
+				EList<EAnnotation> listAnnotation = temp.getEAnnotations();
+				if(listAnnotation.size() > 0) {
+					String[] listNameConstraint = listAnnotation.get(0).getDetails().get(0).getValue().split(" ");
+					for (String string : listNameConstraint) {
+						System.out.println(cls.name() + " " + string + "  " + listAnnotation.get(1).getDetails().get(string));
+						UseModelApi useModelApi = new UseModelApi(newModel);
+						try {
+							newModel.addClassInvariant(useModelApi.createInvariant(string, cls.name(), listAnnotation.get(1).getDetails().get(string), false));
+						} catch (MInvalidModelException | UseApiException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+			}
+		}
+		
 		MSystem mySystem = new MSystem(newModel);
 		mySession.setSystem(mySystem);
+		
 	}
 }
